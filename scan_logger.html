@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Industrial Scan Logger</title>
+    <!-- Use html5-qrcode via CDN for Camera QR decoding -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        :root {
+            --bg: #121212;
+            --surface: #1E1E1E;
+            --surface-hover: #2C2C2C;
+            --primary: #1C6E8C;
+            /* LBE Logo Color */
+            --danger: #FF1744;
+            --text: #FFFFFF;
+            --text-muted: #AAAAAA;
+            --border: #333333;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--surface);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1rem;
+            }
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .dashboard-card {
+            background-color: var(--bg);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            padding: 0.5rem 1.5rem;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(28, 110, 140, 0.2);
+            min-width: 120px;
+        }
+
+        .dashboard-card .label {
+            font-size: 0.8rem;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.2rem;
+            font-weight: bold;
+        }
+
+        .dashboard-card .value {
+            font-size: 2.2rem;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .operator-input {
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+            text-align: center;
+            width: 150px;
+        }
+
+        .operator-input:focus {
+            border-color: var(--primary);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+        }
+
+        .scanner-section {
+            flex: 1;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            max-width: 450px;
+            background-color: var(--surface);
+        }
+
+        @media (max-width: 900px) {
+            .scanner-section {
+                border-right: none;
+                border-bottom: 2px solid var(--border);
+                max-width: 100%;
+            }
+        }
+
+        #reader {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid var(--border);
+            background-color: #000;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .camera-controls {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .btn {
+            background-color: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 0.8rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background-color: rgba(28, 110, 140, 0.1);
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background-color: rgba(28, 110, 140, 0.2);
+            box-shadow: 0 4px 12px rgba(28, 110, 140, 0.3);
+        }
+
+        .btn-danger {
+            background-color: rgba(255, 23, 68, 0.1);
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background-color: rgba(255, 23, 68, 0.2);
+            box-shadow: 0 4px 12px rgba(255, 23, 68, 0.3);
+        }
+
+        .data-section {
+            flex: 2;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: var(--bg);
+        }
+
+        @media (max-width: 900px) {
+            .data-section {
+                min-height: 500px;
+            }
+        }
+
+        .data-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .table-container {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background-color: var(--surface);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th,
+        td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #161616;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        tbody tr {
+            transition: background-color 0.2s;
+        }
+
+        tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .scan-value {
+            font-family: 'Consolas', 'Courier New', monospace;
+            color: var(--primary);
+            font-weight: bold;
+            word-break: break-all;
+            font-size: 1.1rem;
+        }
+
+        /* Flash overlay */
+        #flash-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(28, 110, 140, 0.45);
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.05s ease-out;
+        }
+
+        #flash-overlay.active {
+            opacity: 1;
+            transition: none;
+        }
+
+        /* Keyboard indicator */
+        .keyboard-listener {
+            margin-top: auto;
+            padding: 1.2rem;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            border: 2px dashed var(--border);
+        }
+
+        .keyboard-listener span {
+            color: var(--primary);
+            font-weight: bold;
+            display: inline-block;
+            margin-left: 5px;
+        }
+
+        .keyboard-listener .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            margin-right: 5px;
+            box-shadow: 0 0 8px var(--primary);
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(28, 110, 140, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 6px rgba(28, 110, 140, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(28, 110, 140, 0);
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Green visual feedback layer -->
+    <div id="flash-overlay"></div>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <img src="./logo.png" alt="LBE Logo" style="height: 50px; width: auto; border-radius: 50%;">
+            <div>
+                <h1>Scan Logger</h1>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Industrial Data Capture
+                    System</div>
+            </div>
+        </div>
+        <div>
+            <input type="text" id="operator-input" class="operator-input" placeholder="Operator ID" value="Operator-01"
+                aria-label="Operator ID">
+        </div>
+        <div class="dashboard-card">
+            <div class="label">Total Scans</div>
+            <div class="value" id="total-scans">0</div>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div class="scanner-section">
+            <h2 style="margin-top: 0; font-size: 1.2rem; color: var(--text-muted); margin-bottom: 1rem;">Camera Scanner
+            </h2>
+            <div id="reader">
+                <span style="color: var(--text-muted); padding: 2rem; text-align: center;">Click "Start Camera" to
+                    enable native camera scanning</span>
+            </div>
+            <div class="camera-controls">
+                <button id="start-camera-btn" class="btn btn-primary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                        </path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    Start Camera
+                </button>
+                <button id="stop-camera-btn" class="btn btn-danger" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                    </svg>
+                    Stop Camera
+                </button>
+            </div>
+
+            <div class="keyboard-listener" style="margin-top: 2rem;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 10px;">
+                    <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                    <path d="M6 8h.001"></path>
+                    <path d="M10 8h.001"></path>
+                    <path d="M14 8h.001"></path>
+                    <path d="M18 8h.001"></path>
+                    <path d="M8 12h.001"></path>
+                    <path d="M12 12h.001"></path>
+                    <path d="M16 12h.001"></path>
+                    <path d="M7 16h10"></path>
+                </svg>
+                <br>
+                Zebra Scanner (HID) <span class="status-dot"></span><span>Ready</span><br>
+                <div style="margin-top: 8px; font-size: 0.8rem; opacity: 0.7;">Listening continuously for external
+                    scanner input...</div>
+            </div>
+        </div>
+
+        <div class="data-section">
+            <div class="data-header">
+                <h2 style="margin: 0; font-size: 1.2rem; color: var(--text-muted);">Real-Time Scan Logs</h2>
+                <div style="display: flex; gap: 1rem;">
+                    <button id="export-btn" class="btn btn-primary">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Export CSV
+                    </button>
+                    <button id="clear-btn" class="btn btn-danger">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                            </path>
+                        </svg>
+                        Clear Logs
+                    </button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table id="log-table">
+                    <thead>
+                        <tr>
+                            <th width="10%">ID #</th>
+                            <th width="40%">Scan Value (QR/Barcode)</th>
+                            <th width="25%">Date and Time</th>
+                            <th width="25%">Scanned By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data rows fall here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ------------------
+        // State Management
+        // ------------------
+        let scanHistory = JSON.parse(localStorage.getItem('scanHistory')) || [];
+
+        // Ensure count uses max ID to prevent duplicates if rows were cleared improperly but history remained 
+        let scanCount = scanHistory.length > 0 ? Math.max(...scanHistory.map(s => s.id)) : 0;
+
+        let html5QrCode;
+        let isCameraRunning = false;
+
+        const flashOverlay = document.getElementById('flash-overlay');
+        const totalScansEl = document.getElementById('total-scans');
+        const tbodyEl = document.querySelector('#log-table tbody');
+        const operatorInput = document.getElementById('operator-input');
+
+        const startCameraBtn = document.getElementById('start-camera-btn');
+        const stopCameraBtn = document.getElementById('stop-camera-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        // On Mount
+        document.addEventListener('DOMContentLoaded', () => {
+            updateDashboard();
+            renderTable();
+        });
+
+        // ------------------
+        // Core Scan Logic
+        // ------------------
+
+        let lastCameraScanTime = 0;
+        let lastCameraScanText = "";
+
+        // Plays a high-pitched beep tone for success verification
+        function playSuccessBeep() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx) {
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.type = 'sine';
+                    oscillator.frequency.value = 800; // 800hz tone
+                    gainNode.gain.value = 0.5;
+                    oscillator.start();
+                    setTimeout(() => oscillator.stop(), 100);
+                }
+            } catch (e) { /* ignore audio context errors if browser blocks autoplay */ }
+        }
+
+        function handleSuccessfulScan(value, source) {
+            const now = new Date();
+
+            // Debounce continuous camera scans of the same QR code (2-second lockout)
+            if (source === 'Camera') {
+                if (value === lastCameraScanText && (now.getTime() - lastCameraScanTime < 2000)) {
+                    return;
+                }
+                lastCameraScanText = value;
+                lastCameraScanTime = now.getTime();
+            }
+
+            // 1. Visual Feedback (Flash Green for 200ms)
+            flashOverlay.classList.add('active');
+            setTimeout(() => flashOverlay.classList.remove('active'), 200);
+
+            // 2. Audio Feedback
+            playSuccessBeep();
+
+            // 3. Increment counters
+            scanCount++;
+
+            // 4. Format Data
+            const operatorId = operatorInput.value.trim() || 'Operator-01';
+
+            // Get timestamp e.g. "2026-02-18 13:44:05"
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+            const scanData = {
+                id: scanCount,
+                value: value,
+                timestamp: timestamp,
+                operator: operatorId
+            };
+
+            // 5. Save to local storage (prepend)
+            scanHistory.unshift(scanData);
+            localStorage.setItem('scanHistory', JSON.stringify(scanHistory));
+
+            // 6. Update View
+            updateDashboard();
+            prependToTable(scanData);
+        }
+
+        function updateDashboard() {
+            totalScansEl.innerText = scanHistory.length;
+        }
+
+        // Render entire UI table on startup
+        function renderTable() {
+            tbodyEl.innerHTML = '';
+            scanHistory.forEach(scan => prependToTable(scan, false));
+        }
+
+        function prependToTable(scan, animate = true) {
+            const row = document.createElement('tr');
+
+            if (animate) {
+                row.style.backgroundColor = 'rgba(28, 110, 140, 0.5)';
+                setTimeout(() => row.style.backgroundColor = '', 1000);
+                row.style.transition = 'background-color 1s ease-out';
+            }
+
+            row.innerHTML = `
+                <td><span style="color:var(--text-muted)">#</span>${scan.id}</td>
+                <td class="scan-value">${escapeHtml(scan.value)}</td>
+                <td>${scan.timestamp}</td>
+                <td>${escapeHtml(scan.operator)}</td>
+            `;
+
+            if (animate && tbodyEl.firstChild) {
+                tbodyEl.insertBefore(row, tbodyEl.firstChild);
+            } else {
+                tbodyEl.appendChild(row);
+            }
+        }
+
+        // Escape output for table layout
+        function escapeHtml(unsafe) {
+            return unsafe
+                .toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // -----------------------------------------------------
+        // Zebra Scanner Keyboard Emulation (HID mode)
+        // -----------------------------------------------------
+
+        let currentScanString = "";
+        let lastKeyTime = 0;
+
+        document.addEventListener('keydown', function (e) {
+            // Ignore if focus is actively inside an input/textarea 
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            const currentTime = new Date().getTime();
+
+            if (e.key === 'Enter') {
+                if (currentScanString.length > 0) {
+                    e.preventDefault();
+                    handleSuccessfulScan(currentScanString, 'Zebra HW');
+                    currentScanString = "";
+                }
+            } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                // Hardware scanners rapid-fire characters (usually 5ms-20ms apart)
+                // If the gap is > 100ms, assume a human was pressing random keys or a new scan started
+                if (currentTime - lastKeyTime > 100) {
+                    currentScanString = "";
+                }
+                currentScanString += e.key;
+                lastKeyTime = currentTime;
+            }
+        });
+
+        // ------------------
+        // External Buttons
+        // ------------------
+
+        clearBtn.addEventListener('click', () => {
+            if (scanHistory.length === 0) return;
+            if (confirm('CAUTION: Are you sure you want to clear all scan logs? This action cannot be undone.')) {
+                scanHistory = [];
+                scanCount = 0;
+                localStorage.removeItem('scanHistory');
+                updateDashboard();
+                renderTable();
+            }
+        });
+
+        exportBtn.addEventListener('click', () => {
+            if (scanHistory.length === 0) {
+                alert('No data to export.');
+                return;
+            }
+
+            // Format for Excel CSV 
+            let csvContent = "ID,ScanQRCodeValue,Date and Time,Scan by\n";
+            scanHistory.forEach(scan => {
+                let val = scan.value.toString().replace(/"/g, '""');
+                let op = scan.operator.toString().replace(/"/g, '""');
+                csvContent += `${scan.id},"${val}",${scan.timestamp},"${op}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+
+            const now = new Date();
+            const filenameDate = now.toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
+            link.setAttribute("download", `EOL_ScanLogs_${filenameDate}.csv`);
+
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // ------------------
+        // Camera Lifecycle
+        // ------------------
+
+        function onScanSuccess(decodedText) {
+            handleSuccessfulScan(decodedText, 'Camera');
+        }
+
+        function startCamera() {
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("reader");
+            }
+
+            const config = { fps: 15, qrbox: { width: 300, height: 300 } };
+
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+                .then(() => {
+                    isCameraRunning = true;
+                    startCameraBtn.style.display = 'none';
+                    stopCameraBtn.style.display = 'flex';
+                })
+                .catch((err) => {
+                    console.error("Camera Error:", err);
+                    alert("Unable to start the camera. Please ensure camera permissions are granted.");
+                });
+        }
+
+        function stopCamera() {
+            if (html5QrCode && isCameraRunning) {
+                html5QrCode.stop().then(() => {
+                    isCameraRunning = false;
+                    stopCameraBtn.style.display = 'none';
+                    startCameraBtn.style.display = 'flex';
+                }).catch((err) => {
+                    console.error("Camera Stop Error:", err);
+                });
+            }
+        }
+
+        startCameraBtn.addEventListener('click', startCamera);
+        stopCameraBtn.addEventListener('click', stopCamera);
+
+    </script>
+</body>
+
+</html>
